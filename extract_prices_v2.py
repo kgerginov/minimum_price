@@ -53,7 +53,7 @@ def parse_min_price(url: str, currency: str):
 
     print(f'Getting lowest price in {currency} for: {game_title} / {url}...')
 
-    for element in page.find_all('span'):
+    for element in page.select('td > span'):
         if should_skip_element(element):
             continue
 
