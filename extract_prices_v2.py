@@ -34,9 +34,9 @@ def parse_min_price(urls: List[str], currency: str):
         prices_per_url = []
 
         page = get_html_page(url=url, currency=currency)
-        game_title: str = page.find('h1').get_text().strip()
+        game_title: str = page.find('h1').get_text(strip=True)
 
-        print(f'Getting lowest price for: {game_title} / {url}...')
+        print(f'Getting lowest price in {currency} for: {game_title} / {url}...')
 
         for element in page.find_all('span'):
             if should_skip_element(element):
