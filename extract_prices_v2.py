@@ -1,4 +1,3 @@
-import csv
 import argparse
 from typing import List, Dict, Union
 
@@ -7,7 +6,26 @@ import requests
 from bs4 import BeautifulSoup
 
 from constants import FieldNameConstants, CurrencyConstants
-from utils import get_constant_class_values, should_skip_element
+from utils import (
+    get_constant_class_values,
+    parse_file_input_urls,
+    convert_data_to_csv,
+    is_number
+)
+
+
+def should_skip_element(element: BeautifulSoup) -> bool:
+    attributes = element.get_attribute_list('class')
+    if element.get('data-no-tax-price') is None:
+        return True
+
+    if 'hidden' in attributes:
+        return True
+
+    if not is_number(element.get('data-no-tax-price')):
+        return True
+
+    return False
 
 
 def get_html_page(url: str, currency: str) -> BeautifulSoup:
@@ -27,55 +45,40 @@ def get_html_page(url: str, currency: str) -> BeautifulSoup:
     return BeautifulSoup(response.text, features='html.parser')
 
 
-def parse_min_price(urls: List[str], currency: str):
-    all_results: List[Dict[str, Union[int, str]]] = []
+def parse_min_price(url: str, currency: str):
+    prices = []
 
-    for url in urls:
-        prices_per_url = []
+    page = get_html_page(url=url, currency=currency)
+    game_title: str = page.find('h1').get_text(strip=True)
 
-        page = get_html_page(url=url, currency=currency)
-        game_title: str = page.find('h1').get_text(strip=True)
+    print(f'Getting lowest price in {currency} for: {game_title} / {url}...')
 
-        print(f'Getting lowest price in {currency} for: {game_title} / {url}...')
+    for element in page.find_all('span'):
+        if should_skip_element(element):
+            continue
 
-        for element in page.find_all('span'):
-            if should_skip_element(element):
-                continue
+        price = float(element.get('data-no-tax-price'))
+        prices.append(round(price, 2))
 
-            price = float(element.get('data-no-tax-price'))
-            prices_per_url.append(round(price, 2))
-
-        all_results.append({
-            FieldNameConstants.URL: url,
-            FieldNameConstants.GAME_NAME: game_title,
-            FieldNameConstants.LOWEST_PRICE: min(prices_per_url) if prices_per_url else 'N/A',
-            FieldNameConstants.CURRENCY: currency
-        })
-
-    return all_results
-
-
-def parse_file_input_urls(path_to_file):
-    result = []
-    with open(path_to_file, 'r') as file:
-        for line in file.readlines():
-            result.append(line.rstrip())
+    result = {
+        FieldNameConstants.URL: url,
+        FieldNameConstants.GAME_NAME: game_title,
+        FieldNameConstants.LOWEST_PRICE: min(prices) if prices else 'N/A',
+        FieldNameConstants.CURRENCY: currency
+    }
 
     return result
 
 
-def convert_data_to_csv(games: List[dict]):
-    fieldnames = get_constant_class_values(FieldNameConstants)
-    with open('game_prices.csv', 'w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames)
-        writer.writeheader()
-        writer.writerows(games)
-
-
 def main(path_to_urls_file: str, currency: str):
+    all_results: List[Dict[str, Union[int, str]]] = []
+
     urls = parse_file_input_urls(path_to_urls_file)
-    data = parse_min_price(urls=urls, currency=currency)
-    convert_data_to_csv(data)
+    for url in urls:
+        data = parse_min_price(url=url, currency=currency)
+        all_results.append(data)
+
+    convert_data_to_csv(all_results)
 
 
 if __name__ == '__main__':
@@ -87,7 +90,7 @@ if __name__ == '__main__':
         help='path to file with urls.'
     )
     parser.add_argument(
-        '--currency', '-c',
+        '-c', '--currency',
         default=CurrencyConstants.EURO,
         type=str,
         help='currency of fetched prices.'
@@ -99,4 +102,3 @@ if __name__ == '__main__':
         path_to_urls_file=args.file_name,
         currency=args.currency
     )
-

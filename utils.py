@@ -1,6 +1,7 @@
+import csv
 from typing import List
 
-from bs4 import BeautifulSoup
+from constants import FieldNameConstants
 
 
 def get_constant_class_values(constants_class) -> List[str]:
@@ -19,15 +20,18 @@ def is_number(s):
         return False
 
 
-def should_skip_element(element: BeautifulSoup) -> bool:
-    attributes = element.get_attribute_list('class')
-    if element.get('data-no-tax-price') is None:
-        return True
+def parse_file_input_urls(path_to_file):
+    result = []
+    with open(path_to_file, 'r') as file:
+        for line in file.readlines():
+            result.append(line.rstrip())
 
-    if 'hidden' in attributes:
-        return True
+    return result
 
-    if not is_number(element.get('data-no-tax-price')):
-        return True
 
-    return False
+def convert_data_to_csv(games: List[dict]):
+    fieldnames = get_constant_class_values(FieldNameConstants)
+    with open('game_prices.csv', 'w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames)
+        writer.writeheader()
+        writer.writerows(games)
